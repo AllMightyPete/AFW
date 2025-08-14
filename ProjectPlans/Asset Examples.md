@@ -48,14 +48,14 @@
         "filetype": "UNIDENTIFIED"
       }
     },
-    "Assets": {
-      "Assetname01": {
-        "Assettype": "Model",
-        "Assettags": [
+    "assets": {
+      "asset_name_01": {
+        "asset_type": "Model",
+        "asset_tags": [
           "Tag01",
           "Tag02"
         ],
-        "AssetContents": [
+        "asset_contents": [
           "01",
           "02",
           "04",
