@@ -1,0 +1,19 @@
+{
+  "FILE_TYPE_DEFINITIONS": {
+    "MAP_COL": {
+      "alias": "COL"
+    },
+    "MAP_NRM": {
+      "alias": "NRM",
+      "is_grayscale": false
+    }
+  },
+  "ASSET_TYPE_DEFINITIONS": {
+    "Surface": {
+      "color": "#1f3e5d"
+    },
+    "Model": {
+      "color": "#b67300"
+    }
+  }
+}

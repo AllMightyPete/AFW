@@ -1,0 +1,6 @@
+{
+  "OUTPUT_BASE_DIR": "../Asset_Library",
+  "OUTPUT_DIRECTORY_PATTERN": "[supplier]/[assettype]/[assetname]",
+  "OUTPUT_FILENAME_PATTERN": "[assetname]_[filetype]_[resolution]",
+  "METADATA_FILENAME": "metadata.json"
+}
