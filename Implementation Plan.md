@@ -39,6 +39,8 @@ Confirm repository layout, verify tests and linters run in CI, and agree on init
 ### Review
 Demonstrate configuration editing round‑trip and validate schema coverage.
 
+**Status:** Review completed and milestone approved.
+
 ## Milestone 2 – PySide6 UI Skeleton
 **Goal:** single-window application with sidebar navigation and placeholders for core workflows.
 
