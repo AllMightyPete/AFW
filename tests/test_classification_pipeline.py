@@ -1,7 +1,9 @@
 import json
 from typing import List
 
+import asset_organiser.config_models as cm
 from asset_organiser.classification import (
+    AssignConstantsModule,
     ClassificationModule,
     ClassificationPipeline,
     ClassificationState,
@@ -43,13 +45,39 @@ def test_rule_based_filetype_module_assigns_types() -> None:
         }
     }
     state = ClassificationState.model_validate(data)
-    module = RuleBasedFileTypeModule({"_col": "MAP_COL", "_nrm": "MAP_NRM"})
+    filetype_defs = {
+        "MAP_COL": cm.FileTypeDefinition(alias="COL", rule_keywords=["_col"]),
+        "MAP_NRM": cm.FileTypeDefinition(alias="NRM", rule_keywords=["_nrm"]),
+    }
+    module = RuleBasedFileTypeModule(filetype_defs)
     pipeline = ClassificationPipeline()
     pipeline.add_module(module)
     result = pipeline.run(state)
     contents = result.sources["src"].contents
     assert contents["1"].filetype == "MAP_COL"
     assert contents["2"].filetype == "MAP_NRM"
+
+
+def test_assign_constants_module_assigns_types() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {
+                    "1": {"filename": "model.fbx"},
+                    "2": {"filename": "readme.txt"},
+                },
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    module = AssignConstantsModule({".fbx": "FILE_MODEL", "readme": "IGNORE"})
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(module)
+    result = pipeline.run(state)
+    contents = result.sources["src"].contents
+    assert contents["1"].filetype == "FILE_MODEL"
+    assert contents["2"].filetype == "IGNORE"
 
 
 def test_json_roundtrip() -> None:
