@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class GeneralSettings(BaseModel):
@@ -25,6 +25,7 @@ class FileTypeDefinition(BaseModel):
     bit_depth_policy: Optional[str] = "preserve"
     is_grayscale: bool = False
     is_standalone: bool = False
+    rule_keywords: List[str] = Field(default_factory=list)
     UI_color: Optional[str] = Field(None, alias="UI-color")
     UI_keybind: Optional[str] = Field(None, alias="UI-keybind")
     LLM_description: Optional[str] = Field(None, alias="LLM-description")
@@ -33,17 +34,16 @@ class FileTypeDefinition(BaseModel):
         default_factory=dict, alias="OVERRIDE_EXPORT_PROFILES"
     )
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class AssetTypeDefinition(BaseModel):
     color: Optional[str] = None
+    rule_keywords: List[str] = Field(default_factory=list)
     LLM_description: Optional[str] = Field(None, alias="LLM-description")
     LLM_examples: List[str] = Field(default_factory=list, alias="LLM-examples")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SupplierDefinition(BaseModel):
@@ -56,8 +56,7 @@ class LLMProviderProfile(BaseModel):
     api_key: str = Field(alias="API Key")
     model_endpoint: str = Field(alias="Model Endpoint")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ClassificationSettings(BaseModel):
@@ -71,8 +70,7 @@ class ClassificationSettings(BaseModel):
         alias="Keyword Rules",
     )
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ChannelInput(BaseModel):
@@ -103,8 +101,7 @@ class ProcessingSettings(BaseModel):
         default_factory=dict, alias="IMAGE_RESOLUTIONS"
     )
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class IndexingSettings(BaseModel):
@@ -121,8 +118,7 @@ class IndexingSettings(BaseModel):
         alias="Rendering Engine",
     )
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class LibraryConfig(BaseModel):
