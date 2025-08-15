@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from ..config_service import ConfigService
+from .constants import AssignConstantsModule
 from .models import ClassificationState
 from .module import ClassificationModule
 from .pipeline import ClassificationPipeline
@@ -26,13 +27,14 @@ class ClassificationService:
         if config_service.library_config is None:
             raise RuntimeError("Library configuration not loaded")
         classification = config_service.library_config.CLASSIFICATION
+        filetype_defs = config_service.library_config.FILE_TYPE_DEFINITIONS
         self.keyword_rules = classification.keyword_rules
-        # ``rule_keywords`` may not be present in older configs
-        self.rule_keywords = getattr(classification, "rule_keywords", {})
 
         self.pipeline = ClassificationPipeline()
-        rule_module = RuleBasedFileTypeModule(self.keyword_rules)
-        self.pipeline.add_module(rule_module)
+        const_module = AssignConstantsModule(self.keyword_rules)
+        self.pipeline.add_module(const_module)
+        rule_module = RuleBasedFileTypeModule(filetype_defs)
+        self.pipeline.add_module(rule_module, after=[const_module.name])
         self.pipeline.add_module(
             _LLMPlaceholderModule(),
             after=[rule_module.name],

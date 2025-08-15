@@ -2,16 +2,23 @@ from __future__ import annotations
 
 from typing import Dict
 
+from ..config_models import FileTypeDefinition
 from .models import ClassificationState
 from .module import ClassificationModule
 
+FileTypeDefs = Dict[str, FileTypeDefinition]
+
 
 class RuleBasedFileTypeModule(ClassificationModule):
-    """Assign filetypes based on keyword rules from configuration."""
+    """Assign filetypes based on ``rule_keywords`` in configuration."""
 
-    def __init__(self, keyword_rules: Dict[str, str]) -> None:
+    def __init__(self, filetype_definitions: FileTypeDefs) -> None:
         super().__init__()
-        self.keyword_rules = {k.lower(): v for k, v in keyword_rules.items()}
+        keyword_rules: Dict[str, str] = {}
+        for filetype, definition in filetype_definitions.items():
+            for keyword in definition.rule_keywords:
+                keyword_rules[keyword.lower()] = filetype
+        self.keyword_rules = keyword_rules
 
     def run(self, state: ClassificationState) -> ClassificationState:
         for source in state.sources.values():
