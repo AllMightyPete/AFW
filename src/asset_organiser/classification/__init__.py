@@ -1,5 +1,6 @@
 """Classification service module framework."""
 
+from .constants import AssignConstantsModule
 from .models import ClassificationState
 from .module import ClassificationModule
 from .pipeline import ClassificationPipeline
@@ -11,5 +12,6 @@ __all__ = [
     "ClassificationModule",
     "ClassificationPipeline",
     "RuleBasedFileTypeModule",
+    "AssignConstantsModule",
     "ClassificationService",
 ]
