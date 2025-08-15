@@ -4,25 +4,24 @@ from typing import Iterable
 
 from ..config_service import ConfigService
 from .models import ClassificationState
-from .module import ClassificationModule
 from .pipeline import ClassificationPipeline
 from .rule_based import RuleBasedFileTypeModule
+from .llm_filetypes import LLMFiletypeModule, LLMClient
 
 
-class _LLMPlaceholderModule(ClassificationModule):
-    """Placeholder for a future LLM-based classification module."""
+class _DummyLLMClient:
+    """Fallback LLM client that performs no classification."""
 
-    def __init__(self, name: str = "LLMModule") -> None:
-        super().__init__(name)
-
-    def run(self, state: ClassificationState) -> ClassificationState:
-        return state
+    def classify_filetype(self, filename: str, prompt: str | None = None) -> str | None:
+        return None
 
 
 class ClassificationService:
     """High level service for executing classification pipelines."""
 
-    def __init__(self, config_service: ConfigService) -> None:
+    def __init__(
+        self, config_service: ConfigService, llm_client: LLMClient | None = None
+    ) -> None:
         if config_service.library_config is None:
             raise RuntimeError("Library configuration not loaded")
         classification = config_service.library_config.CLASSIFICATION
@@ -30,13 +29,15 @@ class ClassificationService:
         # ``rule_keywords`` may not be present in older configs
         self.rule_keywords = getattr(classification, "rule_keywords", {})
 
-        self.pipeline = ClassificationPipeline()
-        rule_module = RuleBasedFileTypeModule(self.keyword_rules)
-        self.pipeline.add_module(rule_module)
-        self.pipeline.add_module(
-            _LLMPlaceholderModule(),
-            after=[rule_module.name],
+        client = llm_client or _DummyLLMClient()
+        llm_module = LLMFiletypeModule(client, classification.llm_prompt)
+        rule_module = RuleBasedFileTypeModule(
+            self.keyword_rules, next_module=llm_module.name
         )
+
+        self.pipeline = ClassificationPipeline()
+        self.pipeline.add_module(rule_module)
+        self.pipeline.add_module(llm_module, after=[rule_module.name])
 
     # ------------------------------------------------------------------
     def classify(self, state: ClassificationState) -> ClassificationState:

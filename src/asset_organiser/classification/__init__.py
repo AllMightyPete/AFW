@@ -4,6 +4,7 @@ from .models import ClassificationState
 from .module import ClassificationModule
 from .pipeline import ClassificationPipeline
 from .rule_based import RuleBasedFileTypeModule
+from .llm_filetypes import LLMFiletypeModule
 from .service import ClassificationService
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "ClassificationModule",
     "ClassificationPipeline",
     "RuleBasedFileTypeModule",
+    "LLMFiletypeModule",
     "ClassificationService",
 ]
