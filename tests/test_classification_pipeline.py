@@ -72,3 +72,87 @@ def test_json_roundtrip() -> None:
     dumped = state.to_json()
     loaded = json.loads(dumped)
     assert loaded["sources"]["s"]["contents"]["1"]["filetype"] == "IGNORE"
+
+
+class RouterModule(ClassificationModule):
+    def __init__(self, log: List[str]) -> None:
+        super().__init__("Router")
+        self.log = log
+
+    def run(self, state: ClassificationState):
+        self.log.append(self.name)
+        next_mods: List[str] = []
+        for source in state.sources.values():
+            for entry in source.contents.values():
+                if entry.filename.endswith(".id"):
+                    entry.filetype = "ID"
+        has_identified = any(
+            entry.filetype is not None
+            for source in state.sources.values()
+            for entry in source.contents.values()
+        )
+        has_unidentified = any(
+            entry.filetype is None
+            for source in state.sources.values()
+            for entry in source.contents.values()
+        )
+        if has_identified:
+            next_mods.append("Identified")
+        if has_unidentified:
+            next_mods.append("Unidentified")
+        return state, next_mods
+
+
+class BranchModule(ClassificationModule):
+    def __init__(self, name: str, log: List[str]) -> None:
+        super().__init__(name)
+        self.log = log
+
+    def run(self, state: ClassificationState):
+        self.log.append(self.name)
+        return state
+
+
+def test_pipeline_routes_to_selected_modules() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {
+                    "1": {"filename": "file.id"},
+                    "2": {"filename": "other"},
+                },
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    log: List[str] = []
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(RouterModule(log))
+    pipeline.add_module(BranchModule("Identified", log), after=["Router"])
+    pipeline.add_module(BranchModule("Unidentified", log), after=["Router"])
+    pipeline.run(state)
+    assert log[0] == "Router"
+    assert set(log[1:]) == {"Identified", "Unidentified"}
+    contents = state.sources["src"].contents
+    assert contents["1"].filetype == "ID"
+    assert contents["2"].filetype is None
+
+
+def test_pipeline_skips_unrouted_modules() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {"1": {"filename": "file.id"}},
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    log: List[str] = []
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(RouterModule(log))
+    pipeline.add_module(BranchModule("Identified", log), after=["Router"])
+    pipeline.add_module(BranchModule("Unidentified", log), after=["Router"])
+    pipeline.run(state)
+    assert log == ["Router", "Identified"]
