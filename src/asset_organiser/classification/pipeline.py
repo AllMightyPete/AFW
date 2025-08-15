@@ -38,17 +38,20 @@ class ClassificationPipeline:
         for name in self._modules:
             indegree[name] = len(self._reverse.get(name, []))
         queue = deque([n for n, d in indegree.items() if d == 0])
-        executed = []
         while queue:
             name = queue.popleft()
             module = self._modules[name]
-            state = module.run(state)
-            executed.append(name)
-            for child in self._graph.get(name, []):
+            result = module.run(state)
+            if isinstance(result, tuple):
+                state, next_modules = result
+                children = list(next_modules)
+            else:
+                state = result
+                children = self._graph.get(name, [])
+            for child in children:
+                if child not in self._modules:
+                    raise KeyError(f"Unknown module {child!r}")
                 indegree[child] -= 1
                 if indegree[child] == 0:
                     queue.append(child)
-        if len(executed) != len(self._modules):
-            missing = set(self._modules) - set(executed)
-            raise RuntimeError(f"Pipeline did not execute modules: {missing}")
         return state
