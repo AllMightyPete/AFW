@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict
 
 from PySide6.QtWidgets import (
@@ -29,6 +30,13 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Asset Organiser")
         self._config = config
 
+        if self._config.library_config is None:
+            try:
+                root_dir = Path(__file__).resolve().parents[3]
+                self._config.set_library_path(root_dir)
+            except Exception:  # pragma: no cover - best effort
+                pass
+
         central = QWidget()
         layout = QHBoxLayout(central)
         self.sidebar = QListWidget()
@@ -39,7 +47,7 @@ class MainWindow(QMainWindow):
 
         # Views
         self.views: Dict[str, QWidget] = {
-            "Workspace": WorkspaceView(),
+            "Workspace": WorkspaceView(self._config),
             "Library": LibraryView(),
             "Settings": SettingsView(self._config),
         }
