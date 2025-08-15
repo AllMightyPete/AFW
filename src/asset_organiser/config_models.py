@@ -60,11 +60,12 @@ class LLMProviderProfile(BaseModel):
 
 
 class ClassificationSettings(BaseModel):
+    llm_provider: Optional[str] = Field(None, alias="LLM Provider")
+    llm_prompt: Optional[str] = Field(None, alias="LLM Prompt")
     providers: List[LLMProviderProfile] = Field(
         default_factory=list,
         alias="Providers",
     )
-    llm_prompt: Optional[str] = Field(None, alias="LLM Prompts")
     keyword_rules: Dict[str, str] = Field(
         default_factory=dict,
         alias="Keyword Rules",
