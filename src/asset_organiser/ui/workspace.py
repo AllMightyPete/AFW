@@ -64,6 +64,7 @@ class WorkspaceView(QWidget):
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Name", "Type"])
         layout.addWidget(self.tree, 1)
+        self.tree.installEventFilter(self)
 
         self._register_hotkeys()
 
@@ -78,10 +79,34 @@ class WorkspaceView(QWidget):
             if not key:
                 continue
             sc = QShortcut(QKeySequence(key), self)
+            sc.setContext(Qt.WidgetWithChildrenShortcut)
             sc.activated.connect(
                 lambda ft_id=ft_id: self.assign_filetype_to_selection(ft_id)
             )
             self._shortcuts.append(sc)
+
+    def eventFilter(self, obj, event):  # type: ignore[override]
+        if obj is self.tree and event.type() == event.Type.KeyPress:
+            for ft_id, definition in self.file_types.items():
+                key = definition.UI_keybind
+                if not key:
+                    continue
+                qt_key = getattr(Qt, f"Key_{key.upper()}", None)
+                if qt_key is not None and event.key() == qt_key:
+                    self.assign_filetype_to_selection(ft_id)
+                    return True
+        return super().eventFilter(obj, event)
+
+    def keyPressEvent(self, event):  # type: ignore[override]
+        for ft_id, definition in self.file_types.items():
+            key = definition.UI_keybind
+            if not key:
+                continue
+            qt_key = getattr(Qt, f"Key_{key.upper()}", None)
+            if qt_key is not None and event.key() == qt_key:
+                self.assign_filetype_to_selection(ft_id)
+                return
+        super().keyPressEvent(event)
 
     # ------------------------------------------------------------------
     # Drag-and-drop events
