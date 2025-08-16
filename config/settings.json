@@ -2,30 +2,5 @@
   "OUTPUT_BASE_DIR": "../Asset_Library",
   "OUTPUT_DIRECTORY_PATTERN": "[supplier]/[assettype]/[assetname]",
   "OUTPUT_FILENAME_PATTERN": "[assetname]_[filetype]_[resolution]",
-  "METADATA_FILENAME": "metadata.json",
-  "CLASSIFICATION": {
-    "Active Provider": "mistral small",
-    "Prompts": {
-      "filetype": "Classify file types",
-      "asset_type": "Classify asset types",
-      "tagging": "Generate tags"
-    },
-    "Providers": [
-      {
-        "Profile Name": "mistral small",
-        "Provider": "Ollama",
-        "API Key": "",
-        "Provider-Accesspoint": "https://api.llm.gestaltservers.com",
-        "Model": "deepseek-r1:1.5b",
-        "Reasoning Effort": "Low"
-      }
-    ],
-    "Keyword Rules": {
-      "readme": "IGNORE"
-    },
-    "Asset Type Keywords": {
-      "MODEL": ["mesh"],
-      "TEXTURE": ["wood"]
-    }
-  }
+  "METADATA_FILENAME": "metadata.json"
 }

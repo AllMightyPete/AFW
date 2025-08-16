@@ -1,0 +1,12 @@
+{
+  "Providers": [
+    {
+      "Profile Name": "mistral small",
+      "Provider": "Ollama",
+      "API Key": "",
+      "Provider-Accesspoint": "https://api.llm.gestaltservers.com",
+      "Model": "deepseek-r1:1.5b",
+      "Reasoning Effort": "Low"
+    }
+  ]
+}

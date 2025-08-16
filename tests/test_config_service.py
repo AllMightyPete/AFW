@@ -21,11 +21,10 @@ def test_loads_and_saves_settings(tmp_path: Path) -> None:
 
 def test_load_library_config_valid(tmp_path: Path) -> None:
     lib_root = tmp_path / "lib"
-    cfg_file = lib_root / ".asset-library" / "config.json"
-    cfg_file.parent.mkdir(parents=True)
-    cfg_file.write_text(
-        json.dumps({"FILE_TYPE_DEFINITIONS": {"MAP_COL": {"alias": "COL"}}})
-    )
+    cfg_dir = lib_root / ".asset-library"
+    cfg_dir.mkdir(parents=True)
+    data = {"MAP_COL": {"alias": "COL"}}
+    (cfg_dir / "file-types.json").write_text(json.dumps(data))
 
     service = ConfigService(app_config_path=tmp_path / "settings.json")
     service.set_library_path(lib_root)
@@ -34,11 +33,10 @@ def test_load_library_config_valid(tmp_path: Path) -> None:
 
 def test_load_library_config_invalid(tmp_path: Path) -> None:
     lib_root = tmp_path / "lib"
-    cfg_file = lib_root / ".asset-library" / "config.json"
-    cfg_file.parent.mkdir(parents=True)
-    cfg_file.write_text(
-        json.dumps({"FILE_TYPE_DEFINITIONS": {"MAP_COL": {"alias": 5}}})
-    )
+    cfg_dir = lib_root / ".asset-library"
+    cfg_dir.mkdir(parents=True)
+    data = {"MAP_COL": {"alias": 5}}
+    (cfg_dir / "file-types.json").write_text(json.dumps(data))
 
     service = ConfigService(app_config_path=tmp_path / "settings.json")
     with pytest.raises(ValidationError):
