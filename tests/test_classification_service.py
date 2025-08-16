@@ -7,6 +7,7 @@ from asset_organiser.config_models import (
     LibraryConfig,
 )
 from asset_organiser.config_service import ConfigService
+from asset_organiser.llm.client import NoOpLLMClient
 
 
 class CountingLLMClient:
@@ -80,7 +81,7 @@ def test_service_separates_and_groups_assets() -> None:
         },
         CLASSIFICATION=ClassificationSettings(keyword_rules={}),
     )
-    service = ClassificationService(cfg_service)
+    service = ClassificationService(cfg_service, llm_client=NoOpLLMClient())
     state = ClassificationService.from_file_list(
         ["mesh_mdl.fbx", "mesh_col.png", "mesh_nrm.png"]
     )

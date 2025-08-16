@@ -3,9 +3,12 @@ from __future__ import annotations
 from typing import Iterable
 
 from ..config_service import ConfigService
+from ..llm.client import LLMClient, NoOpLLMClient
+from ..llm.ollama import OllamaClient
+from ..llm.openai import OpenAIClient
 from .constants import AssignConstantsModule
 from .llm_asset_type import LLMAssetTypeModule
-from .llm_filetypes import LLMClient, LLMFiletypeModule, NoOpLLMClient
+from .llm_filetypes import LLMFiletypeModule
 from .llm_grouping import LLMGroupFilesModule
 from .llm_naming import LLMAssetNameModule
 from .llm_tagging import LLMTaggingModule
@@ -32,7 +35,19 @@ class ClassificationService:
         self.keyword_rules = classification.keyword_rules
 
         if llm_client is None:
-            llm_client = NoOpLLMClient()
+            provider = (classification.provider or "").lower()
+            if provider == "openai":
+                llm_client = OpenAIClient.from_settings(
+                    classification,
+                    provider,
+                )
+            elif provider == "ollama":
+                llm_client = OllamaClient.from_settings(
+                    classification,
+                    provider,
+                )
+            else:
+                llm_client = NoOpLLMClient()
 
         self.pipeline = ClassificationPipeline()
         const_module = AssignConstantsModule(self.keyword_rules)

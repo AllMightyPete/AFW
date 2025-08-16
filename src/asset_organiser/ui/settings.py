@@ -16,8 +16,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config_models import AssetTypeDefinition, FileTypeDefinition
+from ..config_models import AssetTypeDefinition  # isort: split
+from ..config_models import FileTypeDefinition, LLMProviderProfile
 from ..config_service import ConfigService
+from ..llm import create_llm_client
 
 
 class GeneralSettingsEditor(QWidget):
@@ -229,6 +231,91 @@ class AssetTypesEditor(QWidget):
         self._config.save_library_config()
 
 
+class LLMProfileEditor(QWidget):
+    """Editor for LLM provider profiles with a connectivity test."""
+
+    def __init__(
+        self,
+        config: ConfigService,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._config = config
+        classification = self._config.library_config.CLASSIFICATION
+        self.profile = (
+            classification.providers[0]
+            if classification.providers
+            else LLMProviderProfile(
+                profile_name="",
+                provider="",
+                api_key="",
+                base_url="",
+                model="",
+                reasoning_effort="Low",
+            )
+        )
+
+        form = QFormLayout(self)
+        self.profile_name = QLineEdit(self.profile.profile_name)
+        self.provider = QLineEdit(self.profile.provider)
+        self.api_key = QLineEdit(self.profile.api_key)
+        self.base_url = QLineEdit(self.profile.base_url)
+        self.model = QLineEdit(self.profile.model)
+        self.reasoning = QLineEdit(self.profile.reasoning_effort)
+
+        form.addRow("Profile Name", self.profile_name)
+        form.addRow("Provider", self.provider)
+        form.addRow("API Key", self.api_key)
+        form.addRow("Provider URL", self.base_url)
+        form.addRow("Model", self.model)
+        form.addRow("Reasoning Effort", self.reasoning)
+
+        btn_row = QHBoxLayout()
+        self.test_btn = QPushButton("Test")
+        self.save_btn = QPushButton("Save")
+        btn_row.addWidget(self.test_btn)
+        btn_row.addWidget(self.save_btn)
+        form.addRow(btn_row)
+
+        self.test_btn.clicked.connect(self.test_profile)
+        self.save_btn.clicked.connect(self.save_profile)
+
+    # ------------------------------------------------------------------
+    def _build_profile(self) -> LLMProviderProfile:
+        return LLMProviderProfile(
+            profile_name=self.profile_name.text(),
+            provider=self.provider.text(),
+            api_key=self.api_key.text(),
+            base_url=self.base_url.text(),
+            model=self.model.text(),
+            reasoning_effort=self.reasoning.text(),
+        )
+
+    # ------------------------------------------------------------------
+    def save_profile(self) -> None:
+        classification = self._config.library_config.CLASSIFICATION
+        profile = self._build_profile()
+        if classification.providers:
+            classification.providers[0] = profile
+        else:
+            classification.providers.append(profile)
+        self._config.library_config.CLASSIFICATION = classification
+        self._config.save_library_config()
+
+    # ------------------------------------------------------------------
+    def test_profile(self) -> None:
+        profile = self._build_profile()
+        try:
+            client = create_llm_client(profile)
+            result = client.complete("ping")
+            if result.strip():
+                QMessageBox.information(self, "LLM Test", "Profile reachable")
+            else:
+                QMessageBox.warning(self, "LLM Test", "No response received")
+        except Exception as exc:  # pragma: no cover - UI feedback
+            QMessageBox.critical(self, "LLM Test", str(exc))
+
+
 class SettingsView(QWidget):
     """Settings view with category navigation."""
 
@@ -250,6 +337,7 @@ class SettingsView(QWidget):
             "General": GeneralSettingsEditor(self._config),
             "File Types": FileTypesEditor(self._config),
             "Asset Types": AssetTypesEditor(self._config),
+            "LLM Profile": LLMProfileEditor(self._config),
         }
 
         for name, editor in self.editors.items():
