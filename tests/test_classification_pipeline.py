@@ -11,6 +11,7 @@ from asset_organiser.classification import (
     KeywordAssetTypeModule,
     LLMAssetNameModule,
     LLMAssetTypeModule,
+    LLMFiletypeModule,
     LLMGroupFilesModule,
     LLMTaggingModule,
     RuleBasedFileTypeModule,
@@ -85,6 +86,35 @@ def test_assign_constants_module_assigns_types() -> None:
     contents = result.sources["src"].contents
     assert contents["1"].filetype == "FILE_MODEL"
     assert contents["2"].filetype == "IGNORE"
+
+
+def test_llm_filetype_module_classifies_unmatched_files() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {"1": {"filename": "wood.xyz"}},
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+
+    class DummyClient:
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def complete(self, prompt: str) -> str:
+            self.prompts.append(prompt)
+            return "MAP_COL"
+
+    client = DummyClient()
+    module = LLMFiletypeModule(client, "filetype")
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(module)
+    pipeline.run(state)
+    contents = state.sources["src"].contents
+    assert contents["1"].filetype == "MAP_COL"
+    assert any("wood.xyz" in p for p in client.prompts)
 
 
 def test_json_roundtrip() -> None:
@@ -193,6 +223,82 @@ def test_pipeline_skips_unrouted_modules() -> None:
     assert log == ["Router", "Identified"]
 
 
+def test_rule_module_routes_unmatched_files_to_llm() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {
+                    "1": {"filename": "wood_col.png"},
+                    "2": {"filename": "other.xyz"},
+                },
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    filetype_defs = {
+        "MAP_COL": cm.FileTypeDefinition(alias="COL", rule_keywords=["_col"])
+    }
+
+    class DummyClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, prompt: str) -> str:
+            self.calls += 1
+            return "MAP_NRM"
+
+    client = DummyClient()
+    llm_module = LLMFiletypeModule(client, "filetype")
+    rule_module = RuleBasedFileTypeModule(
+        filetype_defs,
+        next_module=llm_module.name,
+    )
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(rule_module)
+    pipeline.add_module(llm_module, after=[rule_module.name])
+    pipeline.run(state)
+    contents = state.sources["src"].contents
+    assert contents["1"].filetype == "MAP_COL"
+    assert contents["2"].filetype == "MAP_NRM"
+    assert client.calls == 1
+
+
+def test_rule_module_skips_llm_when_all_classified() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {"1": {"filename": "wood_col.png"}},
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    filetype_defs = {
+        "MAP_COL": cm.FileTypeDefinition(alias="COL", rule_keywords=["_col"])
+    }
+
+    class DummyClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, prompt: str) -> str:
+            self.calls += 1
+            return "MAP_NRM"
+
+    client = DummyClient()
+    llm_module = LLMFiletypeModule(client, "filetype")
+    rule_module = RuleBasedFileTypeModule(
+        filetype_defs,
+        next_module=llm_module.name,
+    )
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(rule_module)
+    pipeline.add_module(llm_module, after=[rule_module.name])
+    pipeline.run(state)
+    assert client.calls == 0
+
+
 def test_separate_standalone_module_creates_assets() -> None:
     data = {
         "sources": {
@@ -279,12 +385,23 @@ def test_llm_asset_name_module_names_grouped_assets() -> None:
         }
     }
     state = ClassificationState.model_validate(data)
-    module = LLMAssetNameModule()
+
+    class RecordingClient:
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def complete(self, prompt: str) -> str:
+            self.prompts.append(prompt)
+            return ""
+
+    client = RecordingClient()
+    module = LLMAssetNameModule(client)
     pipeline = ClassificationPipeline()
     pipeline.add_module(module)
     pipeline.run(state)
     asset = state.sources["src"].assets["0"]
     assert asset.asset_name == "wood"
+    assert any("wood_col.png" in p for p in client.prompts)
 
 
 def test_keyword_asset_type_module_assigns_types() -> None:
@@ -350,9 +467,20 @@ def test_llm_tagging_module_assigns_tags() -> None:
         }
     }
     state = ClassificationState.model_validate(data)
-    module = LLMTaggingModule(None)
+
+    class DummyClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, prompt: str) -> str:
+            self.calls += 1
+            return "wood, plank"
+
+    client = DummyClient()
+    module = LLMTaggingModule(client, "tagging")
     pipeline = ClassificationPipeline()
     pipeline.add_module(module)
     result = pipeline.run(state)
     asset = result.sources["src"].assets["0"]
     assert asset.asset_tags == ["wood", "plank"]
+    assert client.calls == 1
