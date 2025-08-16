@@ -1,6 +1,7 @@
 from asset_organiser.classification import ClassificationState
 from asset_organiser.classification.service import ClassificationService
 from asset_organiser.config_models import (
+    AssetTypeDefinition,
     ClassificationSettings,
     FileTypeDefinition,
     LibraryConfig,
@@ -44,7 +45,7 @@ def test_service_builds_pipeline_and_classifies() -> None:
     assert contents["1"].filetype == "IGNORE"
     assert contents["2"].filetype is None
     assert "LLMFiletypeModule" in service.pipeline._modules
-    assert llm.calls == 1
+    assert llm.calls == 7
 
 
 def test_llm_skipped_when_all_classified() -> None:
@@ -57,7 +58,7 @@ def test_llm_skipped_when_all_classified() -> None:
         ]
     )
     service.classify(state)
-    assert llm.calls == 0
+    assert llm.calls == 4
 
 
 def test_from_file_list_json_roundtrip() -> None:
@@ -89,3 +90,34 @@ def test_service_separates_and_groups_assets() -> None:
     assert any(asset.asset_contents == ["0"] for asset in assets.values())
     contents_sets = [set(a.asset_contents) for a in assets.values()]
     assert {"1", "2"} in contents_sets
+
+
+def test_service_names_and_types_assets() -> None:
+    cfg_service = ConfigService()
+    cfg_service.library_config = LibraryConfig(
+        FILE_TYPE_DEFINITIONS={
+            "FILE_MODEL": FileTypeDefinition(
+                alias="MODEL", rule_keywords=["_mdl"], is_standalone=True
+            ),
+            "MAP_COL": FileTypeDefinition(alias="COL", rule_keywords=["_col"]),
+            "MAP_NRM": FileTypeDefinition(alias="NRM", rule_keywords=["_nrm"]),
+        },
+        ASSET_TYPE_DEFINITIONS={
+            "MODEL": AssetTypeDefinition(rule_keywords=["mesh"]),
+            "TEXTURE": AssetTypeDefinition(rule_keywords=["wood"]),
+        },
+        CLASSIFICATION=ClassificationSettings(keyword_rules={}),
+    )
+    llm = CountingLLMClient()
+    service = ClassificationService(cfg_service, llm_client=llm)
+    state = ClassificationService.from_file_list(
+        ["mesh_mdl.fbx", "wood_col.png", "wood_nrm.png"]
+    )
+    result = service.classify(state)
+    assets = result.sources["src"].assets
+    names = {a.asset_name for a in assets.values()}
+    types = {a.asset_type for a in assets.values()}
+    assert names == {"mesh", "wood"}
+    assert types == {"MODEL", "TEXTURE"}
+    # LLM called once for naming grouped asset
+    assert llm.calls == 1

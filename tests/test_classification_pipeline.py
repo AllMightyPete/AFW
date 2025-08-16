@@ -4,9 +4,13 @@ from typing import List
 import asset_organiser.config_models as cm
 from asset_organiser.classification import (
     AssignConstantsModule,
+    AssignStandaloneNameModule,
     ClassificationModule,
     ClassificationPipeline,
     ClassificationState,
+    KeywordAssetTypeModule,
+    LLMAssetNameModule,
+    LLMAssetTypeModule,
     LLMGroupFilesModule,
     RuleBasedFileTypeModule,
     SeparateStandaloneModule,
@@ -239,3 +243,96 @@ def test_llm_group_files_module_groups_unassigned_files() -> None:
     assert any(set(a.asset_contents) == {"3", "4"} for a in assets.values())
     # ensure existing asset unchanged
     assert set(assets["0"].asset_contents) == {"1", "2"}
+
+
+def test_assign_standalone_name_module_names_assets() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {"1": {"filename": "tree.fbx"}},
+                "assets": {"0": {"asset_contents": ["1"]}},
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    module = AssignStandaloneNameModule()
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(module)
+    pipeline.run(state)
+    asset = state.sources["src"].assets["0"]
+    assert asset.asset_name == "tree"
+
+
+def test_llm_asset_name_module_names_grouped_assets() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {
+                    "1": {"filename": "wood_col.png"},
+                    "2": {"filename": "wood_nrm.png"},
+                },
+                "assets": {"0": {"asset_contents": ["1", "2"]}},
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    module = LLMAssetNameModule()
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(module)
+    pipeline.run(state)
+    asset = state.sources["src"].assets["0"]
+    assert asset.asset_name == "wood"
+
+
+def test_keyword_asset_type_module_assigns_types() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {},
+                "assets": {
+                    "0": {"asset_name": "wood"},
+                    "1": {"asset_name": "rock"},
+                },
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    defs = {"MAT": cm.AssetTypeDefinition(rule_keywords=["wood"])}
+    module = KeywordAssetTypeModule(defs, next_module="LLM")
+    result = module.run(state)
+    assets = state.sources["src"].assets
+    assert assets["0"].asset_type == "MAT"
+    assert isinstance(result, tuple)
+    assert result[1] == ["LLM"]
+
+
+def test_llm_asset_type_module_assigns_types() -> None:
+    class DummyClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, prompt: str) -> str:
+            self.calls += 1
+            return "TYPE"
+
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {},
+                "assets": {"0": {"asset_name": "wood"}},
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    client = DummyClient()
+    module = LLMAssetTypeModule(client, "prompt")
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(module)
+    pipeline.run(state)
+    asset = state.sources["src"].assets["0"]
+    assert asset.asset_type == "TYPE"
+    assert client.calls == 1
