@@ -12,6 +12,7 @@ from asset_organiser.classification import (
     LLMAssetNameModule,
     LLMAssetTypeModule,
     LLMGroupFilesModule,
+    LLMTaggingModule,
     RuleBasedFileTypeModule,
     SeparateStandaloneModule,
 )
@@ -336,3 +337,22 @@ def test_llm_asset_type_module_assigns_types() -> None:
     asset = state.sources["src"].assets["0"]
     assert asset.asset_type == "TYPE"
     assert client.calls == 1
+
+
+def test_llm_tagging_module_assigns_tags() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {},
+                "assets": {"0": {"asset_name": "wood_plank"}},
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    module = LLMTaggingModule(None)
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(module)
+    result = pipeline.run(state)
+    asset = result.sources["src"].assets["0"]
+    assert asset.asset_tags == ["wood", "plank"]
