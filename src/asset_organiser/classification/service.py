@@ -8,7 +8,9 @@ from .llm_asset_type import LLMAssetTypeModule
 from .llm_filetypes import LLMClient, LLMFiletypeModule, NoOpLLMClient
 from .llm_grouping import LLMGroupFilesModule
 from .llm_naming import LLMAssetNameModule
+from .llm_tagging import LLMTaggingModule
 from .models import ClassificationState
+from .output import OutputModule
 from .pipeline import ClassificationPipeline
 from .rule_based import KeywordAssetTypeModule, RuleBasedFileTypeModule
 from .standalone import AssignStandaloneNameModule, SeparateStandaloneModule
@@ -71,6 +73,10 @@ class ClassificationService:
             llm_type_module,
             after=[keyword_type_module.name],
         )
+        tagging_module = LLMTaggingModule(llm_client, classification.prompt)
+        self.pipeline.add_module(tagging_module, after=[llm_type_module.name])
+        output_module = OutputModule()
+        self.pipeline.add_module(output_module, after=[tagging_module.name])
 
     # ------------------------------------------------------------------
     def classify(self, state: ClassificationState) -> ClassificationState:

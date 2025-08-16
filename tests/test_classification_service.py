@@ -45,7 +45,7 @@ def test_service_builds_pipeline_and_classifies() -> None:
     assert contents["1"].filetype == "IGNORE"
     assert contents["2"].filetype is None
     assert "LLMFiletypeModule" in service.pipeline._modules
-    assert llm.calls == 7
+    assert llm.calls == 10
 
 
 def test_llm_skipped_when_all_classified() -> None:
@@ -58,7 +58,7 @@ def test_llm_skipped_when_all_classified() -> None:
         ]
     )
     service.classify(state)
-    assert llm.calls == 4
+    assert llm.calls == 6
 
 
 def test_from_file_list_json_roundtrip() -> None:
@@ -119,5 +119,8 @@ def test_service_names_and_types_assets() -> None:
     types = {a.asset_type for a in assets.values()}
     assert names == {"mesh", "wood"}
     assert types == {"MODEL", "TEXTURE"}
-    # LLM called once for naming grouped asset
-    assert llm.calls == 1
+    tags = {a.asset_name: a.asset_tags for a in assets.values()}
+    assert tags["mesh"] == ["mesh"]
+    assert tags["wood"] == ["wood"]
+    # LLM called once for naming grouped asset and twice for tagging
+    assert llm.calls == 3
