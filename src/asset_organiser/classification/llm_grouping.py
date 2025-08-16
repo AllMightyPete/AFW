@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict
 
-from .llm_filetypes import LLMClient, NoOpLLMClient
+from ..llm.client import LLMClient, NoOpLLMClient
 from .models import AssetEntry, ClassificationState
 from .module import ClassificationModule
 

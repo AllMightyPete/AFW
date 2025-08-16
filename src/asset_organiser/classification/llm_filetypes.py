@@ -1,23 +1,8 @@
 from __future__ import annotations
 
-from typing import Protocol
-
+from ..llm.client import LLMClient
 from .models import ClassificationState
 from .module import ClassificationModule
-
-
-class LLMClient(Protocol):
-    """Protocol for LLM clients used by :class:`LLMFiletypeModule`."""
-
-    def complete(self, prompt: str) -> str:
-        """Return the model's textual completion for ``prompt``."""
-
-
-class NoOpLLMClient:
-    """Fallback LLM client that performs no classification."""
-
-    def complete(self, prompt: str) -> str:  # pragma: no cover - trivial
-        return ""
 
 
 class LLMFiletypeModule(ClassificationModule):

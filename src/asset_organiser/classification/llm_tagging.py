@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from .llm_filetypes import LLMClient, NoOpLLMClient
+from ..llm.client import LLMClient, NoOpLLMClient
 from .models import ClassificationState
 from .module import ClassificationModule
 

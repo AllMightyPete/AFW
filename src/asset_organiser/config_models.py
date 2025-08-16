@@ -53,17 +53,32 @@ class SupplierDefinition(BaseModel):
 class LLMProviderProfile(BaseModel):
     profile_name: str = Field(alias="Profile Name")
     provider: str = Field(alias="Provider")
-    api_key: str = Field(alias="API Key")
-    model_endpoint: str = Field(alias="Model Endpoint")
+    api_key: str = Field("", alias="API Key")
+    base_url: str = Field("", alias="Provider-Accesspoint")
+    model: str = Field("", alias="Model")
+    reasoning_effort: str = Field("Low", alias="Reasoning Effort")
 
     model_config = ConfigDict(populate_by_name=True)
 
 
+def _default_provider_profiles() -> List[LLMProviderProfile]:
+    return [
+        LLMProviderProfile(
+            profile_name="mistral small",
+            provider="Ollama",
+            api_key="",
+            base_url="https://api.llm.gestaltservers.com",
+            model="deepseek-r1:1.5b",
+            reasoning_effort="Low",
+        )
+    ]
+
+
 class ClassificationSettings(BaseModel):
-    provider: Optional[str] = Field(None, alias="LLM Provider")
+    provider: Optional[str] = Field("Ollama", alias="LLM Provider")
     prompt: str = Field("", alias="LLM Prompt")
     providers: List[LLMProviderProfile] = Field(
-        default_factory=list,
+        default_factory=_default_provider_profiles,
         alias="Providers",
     )
     keyword_rules: Dict[str, str] = Field(
