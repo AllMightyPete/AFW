@@ -8,7 +8,16 @@ from asset_organiser.config_models import (
 from asset_organiser.config_service import ConfigService
 
 
-def _make_service() -> ClassificationService:
+class CountingLLMClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def complete(self, prompt: str) -> str:
+        self.calls += 1
+        return ""
+
+
+def _make_service(llm_client: CountingLLMClient | None = None) -> ClassificationService:
     cfg_service = ConfigService()
     cfg_service.library_config = LibraryConfig(
         FILE_TYPE_DEFINITIONS={
@@ -18,11 +27,12 @@ def _make_service() -> ClassificationService:
             keyword_rules={"readme": "IGNORE"},
         ),
     )
-    return ClassificationService(cfg_service)
+    return ClassificationService(cfg_service, llm_client=llm_client)
 
 
 def test_service_builds_pipeline_and_classifies() -> None:
-    service = _make_service()
+    llm = CountingLLMClient()
+    service = _make_service(llm)
     state = ClassificationService.from_file_list(
         ["wood_col.png", "readme.txt", "other.txt"]
     )
@@ -31,7 +41,16 @@ def test_service_builds_pipeline_and_classifies() -> None:
     assert contents["0"].filetype == "MAP_COL"
     assert contents["1"].filetype == "IGNORE"
     assert contents["2"].filetype is None
-    assert "LLMModule" in service.pipeline._modules
+    assert "LLMFiletypeModule" in service.pipeline._modules
+    assert llm.calls == 1
+
+
+def test_llm_skipped_when_all_classified() -> None:
+    llm = CountingLLMClient()
+    service = _make_service(llm)
+    state = ClassificationService.from_file_list(["wood_col.png", "readme.txt"])
+    service.classify(state)
+    assert llm.calls == 0
 
 
 def test_from_file_list_json_roundtrip() -> None:
