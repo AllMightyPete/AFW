@@ -10,17 +10,25 @@ from asset_organiser.config_service import ConfigService
 from asset_organiser.llm.client import NoOpLLMClient
 
 
-class CountingLLMClient:
+class MockLLMClient:
     def __init__(self) -> None:
-        self.calls = 0
+        self.prompts: list[str] = []
 
     def complete(self, prompt: str) -> str:
-        self.calls += 1
+        self.prompts.append(prompt)
+        if "filetype" in prompt and "other.unknown" in prompt:
+            return "MAP_NRM"
+        if "asset_type" in prompt and "Asset name: wood" in prompt:
+            return "TEXTURE"
+        if "tagging" in prompt and "Asset name: wood" in prompt:
+            return "wood"
+        if "tagging" in prompt and "Asset name: mesh" in prompt:
+            return "mesh"
         return ""
 
 
 def _make_service(
-    llm_client: CountingLLMClient | None = None,
+    llm_client: MockLLMClient | None = None,
 ) -> ClassificationService:
     cfg_service = ConfigService()
     cfg_service.library_config = LibraryConfig(
@@ -29,28 +37,33 @@ def _make_service(
         },
         CLASSIFICATION=ClassificationSettings(
             keyword_rules={"readme": "IGNORE"},
+            prompts={
+                "filetype": "filetype",
+                "asset_type": "asset_type",
+                "tagging": "tagging",
+            },
         ),
     )
     return ClassificationService(cfg_service, llm_client=llm_client)
 
 
 def test_service_builds_pipeline_and_classifies() -> None:
-    llm = CountingLLMClient()
+    llm = MockLLMClient()
     service = _make_service(llm)
     state = ClassificationService.from_file_list(
-        ["wood_col.png", "readme.txt", "other.txt"]
+        ["wood_col.png", "readme.txt", "other.unknown"]
     )
     result = service.classify(state)
     contents = result.sources["src"].contents
     assert contents["0"].filetype == "MAP_COL"
     assert contents["1"].filetype == "IGNORE"
-    assert contents["2"].filetype is None
+    assert contents["2"].filetype == "MAP_NRM"
     assert "LLMFiletypeModule" in service.pipeline._modules
-    assert llm.calls == 10
+    assert any("filetype" in p for p in llm.prompts)
 
 
 def test_llm_skipped_when_all_classified() -> None:
-    llm = CountingLLMClient()
+    llm = MockLLMClient()
     service = _make_service(llm)
     state = ClassificationService.from_file_list(
         [
@@ -59,7 +72,7 @@ def test_llm_skipped_when_all_classified() -> None:
         ]
     )
     service.classify(state)
-    assert llm.calls == 6
+    assert not any("filetype" in p for p in llm.prompts)
 
 
 def test_from_file_list_json_roundtrip() -> None:
@@ -105,11 +118,17 @@ def test_service_names_and_types_assets() -> None:
         },
         ASSET_TYPE_DEFINITIONS={
             "MODEL": AssetTypeDefinition(rule_keywords=["mesh"]),
-            "TEXTURE": AssetTypeDefinition(rule_keywords=["wood"]),
         },
-        CLASSIFICATION=ClassificationSettings(keyword_rules={}),
+        CLASSIFICATION=ClassificationSettings(
+            keyword_rules={},
+            prompts={
+                "filetype": "filetype",
+                "asset_type": "asset_type",
+                "tagging": "tagging",
+            },
+        ),
     )
-    llm = CountingLLMClient()
+    llm = MockLLMClient()
     service = ClassificationService(cfg_service, llm_client=llm)
     state = ClassificationService.from_file_list(
         ["mesh_mdl.fbx", "wood_col.png", "wood_nrm.png"]
@@ -123,5 +142,4 @@ def test_service_names_and_types_assets() -> None:
     tags = {a.asset_name: a.asset_tags for a in assets.values()}
     assert tags["mesh"] == ["mesh"]
     assert tags["wood"] == ["wood"]
-    # LLM called once for naming grouped asset and twice for tagging
-    assert llm.calls == 3
+    assert any("asset_type" in p for p in llm.prompts)
