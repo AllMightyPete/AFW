@@ -38,4 +38,3 @@ class LLMFiletypeModule(ClassificationModule):
                 if result:
                     entry.filetype = result
         return state
-

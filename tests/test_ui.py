@@ -1,15 +1,20 @@
 import os
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
-
-import asset_organiser.config_models as cm
-from asset_organiser import ConfigService
-from asset_organiser.ui import MainWindow, WorkspaceView
+import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+try:
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
+
+    import asset_organiser.config_models as cm
+    from asset_organiser import ConfigService
+    from asset_organiser.ui import MainWindow, WorkspaceView
+except Exception as exc:  # pragma: no cover - environment-specific
+    pytest.skip(f"PySide6 not available: {exc}", allow_module_level=True)
 
 
 def test_main_window_loads_and_saves_settings(tmp_path: Path) -> None:

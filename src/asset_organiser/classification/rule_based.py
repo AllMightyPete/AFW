@@ -12,7 +12,12 @@ FileTypeDefs = Dict[str, FileTypeDefinition]
 class RuleBasedFileTypeModule(ClassificationModule):
     """Assign filetypes based on ``rule_keywords`` in configuration."""
 
-    def __init__(self, filetype_definitions: FileTypeDefs, *, next_module: str | None = None) -> None:
+    def __init__(
+        self,
+        filetype_definitions: FileTypeDefs,
+        *,
+        next_module: str | None = None,
+    ) -> None:
         super().__init__()
         keyword_rules: Dict[str, str] = {}
         for filetype, definition in filetype_definitions.items():
