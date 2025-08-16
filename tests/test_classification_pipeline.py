@@ -7,7 +7,9 @@ from asset_organiser.classification import (
     ClassificationModule,
     ClassificationPipeline,
     ClassificationState,
+    LLMGroupFilesModule,
     RuleBasedFileTypeModule,
+    SeparateStandaloneModule,
 )
 
 
@@ -184,3 +186,56 @@ def test_pipeline_skips_unrouted_modules() -> None:
     pipeline.add_module(BranchModule("Unidentified", log), after=["Router"])
     pipeline.run(state)
     assert log == ["Router", "Identified"]
+
+
+def test_separate_standalone_module_creates_assets() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {
+                    "1": {"filename": "model.fbx", "filetype": "FILE_MODEL"},
+                    "2": {"filename": "wood_col.png", "filetype": "MAP_COL"},
+                },
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    filetype_defs = {
+        "FILE_MODEL": cm.FileTypeDefinition(alias="MODEL", is_standalone=True),
+        "MAP_COL": cm.FileTypeDefinition(alias="COL"),
+    }
+    module = SeparateStandaloneModule(filetype_defs)
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(module)
+    pipeline.run(state)
+    assets = state.sources["src"].assets
+    assert len(assets) == 1
+    asset = next(iter(assets.values()))
+    assert asset.asset_contents == ["1"]
+
+
+def test_llm_group_files_module_groups_unassigned_files() -> None:
+    data = {
+        "sources": {
+            "src": {
+                "metadata": {},
+                "contents": {
+                    "1": {"filename": "wood_col.png"},
+                    "2": {"filename": "wood_nrm.png"},
+                    "3": {"filename": "rock_col.png"},
+                    "4": {"filename": "rock_nrm.png"},
+                },
+                "assets": {"0": {"asset_contents": ["1", "2"]}},
+            }
+        }
+    }
+    state = ClassificationState.model_validate(data)
+    module = LLMGroupFilesModule()
+    pipeline = ClassificationPipeline()
+    pipeline.add_module(module)
+    pipeline.run(state)
+    assets = state.sources["src"].assets
+    assert any(set(a.asset_contents) == {"3", "4"} for a in assets.values())
+    # ensure existing asset unchanged
+    assert set(assets["0"].asset_contents) == {"1", "2"}
