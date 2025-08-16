@@ -11,6 +11,7 @@ class FileEntry(BaseModel):
 
 
 class AssetEntry(BaseModel):
+    asset_name: Optional[str] = None
     asset_type: Optional[str] = None
     asset_tags: List[str] = Field(default_factory=list)
     asset_contents: List[str] = Field(default_factory=list)

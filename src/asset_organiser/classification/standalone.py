@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, List
 
 from ..config_models import FileTypeDefinition
@@ -71,4 +72,33 @@ class SeparateStandaloneModule(ClassificationModule):
             next_modules.append(self._grouping_next)
         if next_modules:
             return state, next_modules
+        return state
+
+
+class AssignStandaloneNameModule(ClassificationModule):
+    """Assign asset names for standalone assets based on filenames."""
+
+    def __init__(self, *, next_module: str | None = None) -> None:
+        super().__init__()
+        self._next = next_module
+
+    def run(
+        self, state: ClassificationState
+    ) -> ClassificationState | tuple[ClassificationState, List[str]]:
+        has_unassigned = False
+        for source in state.sources.values():
+            assigned_files = set()
+            for asset in source.assets.values():
+                assigned_files.update(asset.asset_contents)
+            unassigned = set(source.contents) - assigned_files
+            if unassigned:
+                has_unassigned = True
+            for asset in source.assets.values():
+                if asset.asset_name or len(asset.asset_contents) != 1:
+                    continue
+                file_id = asset.asset_contents[0]
+                filename = source.contents[file_id].filename
+                asset.asset_name = Path(filename).stem.split("_")[0]
+        if not has_unassigned and self._next:
+            return state, [self._next]
         return state
