@@ -1,0 +1,15 @@
+{
+  "Active Provider": "mistral small",
+  "Prompts": {
+    "filetype": "Classify file types",
+    "asset_type": "Classify asset types",
+    "tagging": "Generate tags"
+  },
+  "Keyword Rules": {
+    "readme": "IGNORE"
+  },
+  "Asset Type Keywords": {
+    "MODEL": ["mesh"],
+    "TEXTURE": ["wood"]
+  }
+}

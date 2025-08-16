@@ -47,28 +47,85 @@ class ConfigService:
     # ------------------------------------------------------------------
     def set_library_path(self, library_root: Path) -> None:
         """Load configuration for the active asset library."""
-        config_file = library_root / ".asset-library" / "config.json"
-        if not config_file.exists():
+        config_dir = library_root / ".asset-library"
+        if not config_dir.exists():
             logger.info(
                 "Creating default library config at %s",
-                config_file,
+                config_dir,
             )
-            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_dir.mkdir(parents=True, exist_ok=True)
             self.library_config = LibraryConfig()
-            text = self.library_config.model_dump_json(indent=2)
-            config_file.write_text(text)
-        else:
-            data = json.loads(config_file.read_text())
-            self.library_config = LibraryConfig.model_validate(data)
+            self.library_path = library_root
+            self.save_library_config()
+            return
+
+        data = self._load_library_config(config_dir)
+        self.library_config = LibraryConfig.model_validate(data)
         self.library_path = library_root
+
+    # ------------------------------------------------------------------
+    def _load_library_config(self, config_dir: Path) -> dict:
+        def read_json(path: Path):
+            if path.exists():
+                return json.loads(path.read_text())
+            return None
+
+        file_types = read_json(config_dir / "file-types.json")
+        asset_types = read_json(config_dir / "asset-types.json")
+        suppliers = read_json(config_dir / "suppliers.json")
+        classification = read_json(config_dir / "classification.json") or {}
+        providers = read_json(config_dir / "llm-profiles.json")
+        if providers and "Providers" in providers:
+            classification["Providers"] = providers["Providers"]
+        processing = read_json(config_dir / "processing.json")
+        indexing = read_json(config_dir / "indexing.json")
+
+        data: dict = {}
+        if file_types is not None:
+            data["FILE_TYPE_DEFINITIONS"] = file_types
+        if asset_types is not None:
+            data["ASSET_TYPE_DEFINITIONS"] = asset_types
+        if suppliers is not None:
+            data["SUPPLIERS"] = suppliers
+        if classification:
+            data["CLASSIFICATION"] = classification
+        if processing is not None:
+            data["PROCESSING"] = processing
+        if indexing is not None:
+            data["INDEXING"] = indexing
+        return data
 
     # ------------------------------------------------------------------
     def save_library_config(self) -> None:
         if self.library_path is None or self.library_config is None:
             raise RuntimeError("Library path not set")
-        config_file = self.library_path / ".asset-library" / "config.json"
-        text = self.library_config.model_dump_json(indent=2)
-        config_file.write_text(text)
+        config_dir = self.library_path / ".asset-library"
+        config_dir.mkdir(parents=True, exist_ok=True)
+
+        data = self.library_config.model_dump(by_alias=True)
+        (config_dir / "file-types.json").write_text(
+            json.dumps(data.get("FILE_TYPE_DEFINITIONS", {}), indent=2)
+        )
+        (config_dir / "asset-types.json").write_text(
+            json.dumps(data.get("ASSET_TYPE_DEFINITIONS", {}), indent=2)
+        )
+        (config_dir / "suppliers.json").write_text(
+            json.dumps(data.get("SUPPLIERS", {}), indent=2)
+        )
+        classification = data.get("CLASSIFICATION", {})
+        providers = {"Providers": classification.pop("Providers", [])}
+        (config_dir / "classification.json").write_text(
+            json.dumps(classification, indent=2)
+        )
+        (config_dir / "llm-profiles.json").write_text(
+            json.dumps(providers, indent=2),
+        )
+        (config_dir / "processing.json").write_text(
+            json.dumps(data.get("PROCESSING", {}), indent=2)
+        )
+        (config_dir / "indexing.json").write_text(
+            json.dumps(data.get("INDEXING", {}), indent=2)
+        )
 
     # ------------------------------------------------------------------
     def get_active_provider_profile(self) -> Optional[LLMProviderProfile]:

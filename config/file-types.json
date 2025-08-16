@@ -1,0 +1,24 @@
+{
+  "MAP_COL": {
+    "alias": "COL",
+    "bit_depth_policy": "preserve",
+    "is_grayscale": false,
+    "is_standalone": false,
+    "rule_keywords": ["col", "albedo", "diffuse"],
+    "UI-color": "#ffaa00",
+    "UI-keybind": "C",
+    "LLM-description": "Color/Albedo Map",
+    "LLM-examples": ["_col.", "_basecolor.", "albedo", "diffuse"]
+  },
+  "MAP_NRM": {
+    "alias": "NRM",
+    "bit_depth_policy": "preserve",
+    "is_grayscale": false,
+    "is_standalone": false,
+    "rule_keywords": ["nrm", "normal"],
+    "UI-color": "#cca2f1",
+    "UI-keybind": "N",
+    "LLM-description": "Normal Map",
+    "LLM-examples": ["_nrm.", "_normal."]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "MODEL": {
+    "color": "#b67300",
+    "rule_keywords": ["mesh"],
+    "LLM-description": "A set that contains models, can include PBR textureset",
+    "LLM-examples": ["Set = Plant02.fbx + Plant02_col + Plant02_SSS"]
+  },
+  "TEXTURE": {
+    "color": "#1f3e5d",
+    "rule_keywords": ["wood"],
+    "LLM-description": "A single Standard PBR material set for a surface.",
+    "LLM-examples": ["Set: Wood01_COL + Wood01_NRM + WOOD01_ROUGH"]
+  }
+}
