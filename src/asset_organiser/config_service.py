@@ -79,7 +79,9 @@ class ConfigService:
         for profile in classification.providers:
             if profile.profile_name == active:
                 return profile
-        return classification.providers[0] if classification.providers else None
+        if classification.providers:
+            return classification.providers[0]
+        return None
 
     # ------------------------------------------------------------------
     def get_classification_prompts(self) -> Dict[str, str]:

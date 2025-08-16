@@ -30,14 +30,16 @@ class ClassificationService:
             raise RuntimeError("Library configuration not loaded")
         classification = config_service.library_config.CLASSIFICATION
         filetype_defs = config_service.library_config.FILE_TYPE_DEFINITIONS
-        assettype_defs = dict(
-            config_service.library_config.ASSET_TYPE_DEFINITIONS
-        )
-        for atype, keywords in config_service.get_asset_type_keywords().items():
+        asset_defs_src = config_service.library_config.ASSET_TYPE_DEFINITIONS
+        assettype_defs = dict(asset_defs_src)
+        asset_keywords = config_service.get_asset_type_keywords()
+        for atype, keywords in asset_keywords.items():
             if atype in assettype_defs:
                 assettype_defs[atype].rule_keywords.extend(keywords)
             else:
-                assettype_defs[atype] = AssetTypeDefinition(rule_keywords=keywords)
+                assettype_defs[atype] = AssetTypeDefinition(
+                    rule_keywords=keywords,
+                )
         self.keyword_rules = classification.keyword_rules
 
         if llm_client is None:
@@ -64,7 +66,10 @@ class ClassificationService:
         self.pipeline.add_module(llm_module, after=[rule_module.name])
 
         # Phase 2: asset grouping
-        llm_type_module = LLMAssetTypeModule(llm_client, prompts.get("asset_type", ""))
+        llm_type_module = LLMAssetTypeModule(
+            llm_client,
+            prompts.get("asset_type", ""),
+        )
         keyword_type_module = KeywordAssetTypeModule(
             assettype_defs, next_module=llm_type_module.name
         )
@@ -91,7 +96,10 @@ class ClassificationService:
             llm_type_module,
             after=[keyword_type_module.name],
         )
-        tagging_module = LLMTaggingModule(llm_client, prompts.get("tagging", ""))
+        tagging_module = LLMTaggingModule(
+            llm_client,
+            prompts.get("tagging", ""),
+        )
         self.pipeline.add_module(tagging_module, after=[llm_type_module.name])
         output_module = OutputModule()
         self.pipeline.add_module(output_module, after=[tagging_module.name])
