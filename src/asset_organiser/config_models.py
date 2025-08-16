@@ -75,8 +75,8 @@ def _default_provider_profiles() -> List[LLMProviderProfile]:
 
 
 class ClassificationSettings(BaseModel):
-    provider: Optional[str] = Field("Ollama", alias="LLM Provider")
-    prompt: str = Field("", alias="LLM Prompt")
+    active_provider: Optional[str] = Field(None, alias="Active Provider")
+    prompts: Dict[str, str] = Field(default_factory=dict, alias="Prompts")
     providers: List[LLMProviderProfile] = Field(
         default_factory=_default_provider_profiles,
         alias="Providers",
@@ -84,6 +84,10 @@ class ClassificationSettings(BaseModel):
     keyword_rules: Dict[str, str] = Field(
         default_factory=dict,
         alias="Keyword Rules",
+    )
+    asset_type_keywords: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        alias="Asset Type Keywords",
     )
 
     model_config = ConfigDict(populate_by_name=True)

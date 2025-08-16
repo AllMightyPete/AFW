@@ -15,5 +15,30 @@
     "Model": {
       "color": "#b67300"
     }
+  },
+  "CLASSIFICATION": {
+    "Active Provider": "mistral small",
+    "Prompts": {
+      "filetype": "Classify file types",
+      "asset_type": "Classify asset types",
+      "tagging": "Generate tags"
+    },
+    "Providers": [
+      {
+        "Profile Name": "mistral small",
+        "Provider": "Ollama",
+        "API Key": "",
+        "Provider-Accesspoint": "https://api.llm.gestaltservers.com",
+        "Model": "deepseek-r1:1.5b",
+        "Reasoning Effort": "Low"
+      }
+    ],
+    "Keyword Rules": {
+      "readme": "IGNORE"
+    },
+    "Asset Type Keywords": {
+      "MODEL": ["mesh"],
+      "TEXTURE": ["wood"]
+    }
   }
 }

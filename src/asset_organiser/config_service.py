@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 from pydantic import ValidationError
 
-from .config_models import GeneralSettings, LibraryConfig
+from .config_models import GeneralSettings, LibraryConfig, LLMProviderProfile
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,31 @@ class ConfigService:
         config_file = self.library_path / ".asset-library" / "config.json"
         text = self.library_config.model_dump_json(indent=2)
         config_file.write_text(text)
+
+    # ------------------------------------------------------------------
+    def get_active_provider_profile(self) -> Optional[LLMProviderProfile]:
+        if self.library_config is None:
+            return None
+        classification = self.library_config.CLASSIFICATION
+        active = classification.active_provider
+        for profile in classification.providers:
+            if profile.profile_name == active:
+                return profile
+        if classification.providers:
+            return classification.providers[0]
+        return None
+
+    # ------------------------------------------------------------------
+    def get_classification_prompts(self) -> Dict[str, str]:
+        if self.library_config is None:
+            return {}
+        return self.library_config.CLASSIFICATION.prompts
+
+    # ------------------------------------------------------------------
+    def get_asset_type_keywords(self) -> Dict[str, List[str]]:
+        if self.library_config is None:
+            return {}
+        return self.library_config.CLASSIFICATION.asset_type_keywords
 
 
 if __name__ == "__main__":

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing import Iterable
 
+from ..config_models import AssetTypeDefinition
 from ..config_service import ConfigService
-from ..llm.client import LLMClient, NoOpLLMClient
-from ..llm.ollama import OllamaClient
-from ..llm.openai import OpenAIClient
+from ..llm import LLMClient, NoOpLLMClient, create_llm_client
 from .constants import AssignConstantsModule
 from .llm_asset_type import LLMAssetTypeModule
 from .llm_filetypes import LLMFiletypeModule
@@ -31,21 +30,25 @@ class ClassificationService:
             raise RuntimeError("Library configuration not loaded")
         classification = config_service.library_config.CLASSIFICATION
         filetype_defs = config_service.library_config.FILE_TYPE_DEFINITIONS
-        assettype_defs = config_service.library_config.ASSET_TYPE_DEFINITIONS
+        asset_defs_src = config_service.library_config.ASSET_TYPE_DEFINITIONS
+        assettype_defs = dict(asset_defs_src)
+        asset_keywords = config_service.get_asset_type_keywords()
+        for atype, keywords in asset_keywords.items():
+            if atype in assettype_defs:
+                assettype_defs[atype].rule_keywords.extend(keywords)
+            else:
+                assettype_defs[atype] = AssetTypeDefinition(
+                    rule_keywords=keywords,
+                )
         self.keyword_rules = classification.keyword_rules
 
         if llm_client is None:
-            provider = (classification.provider or "").lower()
-            if provider == "openai":
-                llm_client = OpenAIClient.from_settings(
-                    classification,
-                    provider,
-                )
-            elif provider == "ollama":
-                llm_client = OllamaClient.from_settings(
-                    classification,
-                    provider,
-                )
+            profile = config_service.get_active_provider_profile()
+            if profile:
+                try:
+                    llm_client = create_llm_client(profile)
+                except Exception:
+                    llm_client = NoOpLLMClient()
             else:
                 llm_client = NoOpLLMClient()
 
@@ -53,7 +56,9 @@ class ClassificationService:
         const_module = AssignConstantsModule(self.keyword_rules)
         self.pipeline.add_module(const_module)
 
-        llm_module = LLMFiletypeModule(llm_client, classification.prompt)
+        prompts = config_service.get_classification_prompts()
+
+        llm_module = LLMFiletypeModule(llm_client, prompts.get("filetype", ""))
         rule_module = RuleBasedFileTypeModule(
             filetype_defs, next_module=llm_module.name
         )
@@ -61,7 +66,10 @@ class ClassificationService:
         self.pipeline.add_module(llm_module, after=[rule_module.name])
 
         # Phase 2: asset grouping
-        llm_type_module = LLMAssetTypeModule(llm_client, classification.prompt)
+        llm_type_module = LLMAssetTypeModule(
+            llm_client,
+            prompts.get("asset_type", ""),
+        )
         keyword_type_module = KeywordAssetTypeModule(
             assettype_defs, next_module=llm_type_module.name
         )
@@ -88,7 +96,10 @@ class ClassificationService:
             llm_type_module,
             after=[keyword_type_module.name],
         )
-        tagging_module = LLMTaggingModule(llm_client, classification.prompt)
+        tagging_module = LLMTaggingModule(
+            llm_client,
+            prompts.get("tagging", ""),
+        )
         self.pipeline.add_module(tagging_module, after=[llm_type_module.name])
         output_module = OutputModule()
         self.pipeline.add_module(output_module, after=[tagging_module.name])
