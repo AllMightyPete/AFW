@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..classification.service import ClassificationService
 from ..config_models import AssetTypeDefinition, FileTypeDefinition
 from ..config_service import ConfigService
 
@@ -39,6 +40,7 @@ class WorkspaceView(QWidget):
         self.asset_types: Dict[str, AssetTypeDefinition] = dict(
             getattr(self._config.library_config, "ASSET_TYPE_DEFINITIONS", {})
         )
+        self._classifier = ClassificationService(self._config)
         # Ensure special types exist
         self.file_types.setdefault(
             "UNIDENTIFIED",
@@ -49,12 +51,12 @@ class WorkspaceView(QWidget):
         toolbar = QHBoxLayout()
         self.add_btn = QPushButton("Add Source(s)")
         self.remove_btn = QPushButton("Remove Selected")
-        self.classify_btn = QPushButton("Classify Selected")
+        self.reclassify_btn = QPushButton("Re-classify")
         self.process_btn = QPushButton("Process All")
         for btn in [
             self.add_btn,
             self.remove_btn,
-            self.classify_btn,
+            self.reclassify_btn,
             self.process_btn,
         ]:
             toolbar.addWidget(btn)
@@ -70,6 +72,7 @@ class WorkspaceView(QWidget):
 
         self.add_btn.clicked.connect(self._add_sources_dialog)
         self.remove_btn.clicked.connect(self.remove_selected)
+        self.reclassify_btn.clicked.connect(self.reclassify)
 
     # ------------------------------------------------------------------
     def _register_hotkeys(self) -> None:
@@ -128,18 +131,50 @@ class WorkspaceView(QWidget):
                 return [Path(f) for f in zf.namelist() if not f.endswith("/")]
         return [path]
 
-    def _group_files(self, files: Iterable[Path]) -> Dict[str, List[Path]]:
-        assets: Dict[str, List[Path]] = {}
-        for file in files:
-            stem = file.stem
-            asset_name = stem.split("_")[0] if "_" in stem else stem
-            assets.setdefault(asset_name, []).append(file)
-        return assets
-
     def _default_asset_type(self) -> str:
         return self._config.settings.DEFAULT_ASSET_TYPE or next(
             iter(self.asset_types.keys()), ""
         )
+
+    def _populate_from_state(
+        self, source_item: QTreeWidgetItem, state
+    ) -> None:  # noqa: E501
+        src = next(iter(state.sources.values()), None)
+        if src is None:
+            return
+        for asset in src.assets.values():
+            asset_type = asset.asset_type or self._default_asset_type()
+            asset_name = asset.asset_name or "Asset"
+            asset_item = QTreeWidgetItem([f"Asset: {asset_name}", asset_type])
+            asset_item.setData(0, Qt.UserRole, "asset")
+            source_item.addChild(asset_item)
+            combo = QComboBox()
+            combo.addItems(sorted(self.asset_types.keys()))
+            combo.setCurrentText(asset_type)
+            combo.currentTextChanged.connect(
+                lambda text, item=asset_item: item.setText(1, text)
+            )
+            self.tree.setItemWidget(asset_item, 1, combo)
+            for file_id in asset.asset_contents:
+                entry = src.contents.get(file_id)
+                if entry is None:
+                    continue
+                filename = Path(entry.filename).name
+                filetype = entry.filetype or "UNIDENTIFIED"
+                file_item = QTreeWidgetItem([filename, filetype])
+                file_item.setData(0, Qt.UserRole, "file")
+                file_item.setData(0, Qt.UserRole + 1, entry.filename)
+                asset_item.addChild(file_item)
+                combo_f = QComboBox()
+                combo_f.addItems(sorted(self.file_types.keys()))
+                combo_f.setCurrentText(filetype)
+                combo_f.currentTextChanged.connect(
+                    lambda text, item=file_item: self._set_file_type(
+                        item, text
+                    )  # noqa: E501
+                )
+                self.tree.setItemWidget(file_item, 1, combo_f)
+                self._set_file_type(file_item, filetype)
 
     # ------------------------------------------------------------------
     def add_paths(self, paths: Iterable[Path]) -> None:
@@ -147,37 +182,11 @@ class WorkspaceView(QWidget):
             source_item = QTreeWidgetItem([path.name, ""])
             source_item.setData(0, Qt.UserRole, "source")
             self.tree.addTopLevelItem(source_item)
-            files = self._collect_files(path)
-            assets = self._group_files(files)
-            for asset_name, asset_files in assets.items():
-                asset_item = QTreeWidgetItem(
-                    [f"Asset: {asset_name}", self._default_asset_type()]
-                )
-                asset_item.setData(0, Qt.UserRole, "asset")
-                source_item.addChild(asset_item)
-                combo = QComboBox()
-                combo.addItems(sorted(self.asset_types.keys()))
-                combo.setCurrentText(self._default_asset_type())
-                combo.currentTextChanged.connect(
-                    lambda text, item=asset_item: item.setText(1, text)
-                )
-                self.tree.setItemWidget(asset_item, 1, combo)
-                for file_path in asset_files:
-                    file_item = QTreeWidgetItem(
-                        [file_path.name, "UNIDENTIFIED"],
-                    )
-                    file_item.setData(0, Qt.UserRole, "file")
-                    asset_item.addChild(file_item)
-                    combo_f = QComboBox()
-                    combo_f.addItems(sorted(self.file_types.keys()))
-                    combo_f.setCurrentText("UNIDENTIFIED")
-                    combo_f.currentTextChanged.connect(
-                        lambda text, item=file_item: self._set_file_type(
-                            item,
-                            text,
-                        ),
-                    )
-                    self.tree.setItemWidget(file_item, 1, combo_f)
+            files = [str(f) for f in self._collect_files(path)]
+            if files:
+                state = ClassificationService.from_file_list(files)
+                result = self._classifier.classify(state)
+                self._populate_from_state(source_item, result)
 
     # ------------------------------------------------------------------
     def _set_file_type(self, item: QTreeWidgetItem, file_type: str) -> None:
@@ -196,6 +205,26 @@ class WorkspaceView(QWidget):
                     combo.setCurrentText(file_type)
                 else:
                     self._set_file_type(item, file_type)
+
+    # ------------------------------------------------------------------
+    def reclassify(self) -> None:
+        for i in range(self.tree.topLevelItemCount()):
+            source_item = self.tree.topLevelItem(i)
+            files: List[str] = []
+            for j in range(source_item.childCount()):
+                asset_item = source_item.child(j)
+                for k in range(asset_item.childCount()):
+                    file_item = asset_item.child(k)
+                    if file_item.data(0, Qt.UserRole) == "file":
+                        path = file_item.data(0, Qt.UserRole + 1)
+                        if path:
+                            files.append(str(path))
+            if not files:
+                continue
+            state = ClassificationService.from_file_list(files)
+            result = self._classifier.classify(state)
+            source_item.takeChildren()
+            self._populate_from_state(source_item, result)
 
     # ------------------------------------------------------------------
     def remove_selected(self) -> None:
